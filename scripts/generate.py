@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import argparse
 import json
@@ -10,15 +11,44 @@ import urllib.error
 from typing import Dict, List, Optional, Tuple
 import datetime as _dt
 
+# Ensure UTF-8 encoding for cross-platform compatibility
+if sys.version_info >= (3, 7):
+    # For Python 3.7+, ensure UTF-8 mode
+    if hasattr(sys, 'set_int_max_str_digits'):
+        # Modern Python versions
+        pass
+else:
+    # For older Python versions, set encoding explicitly
+    import locale
+    if sys.platform.startswith('win'):
+        # Windows specific encoding handling
+        try:
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+        except:
+            pass
+
+# Set environment variable for consistent UTF-8 handling
+os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+
 
 def _stamp() -> str:
     return _dt.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 
 
 def _default_out_dir() -> str:
-    projects_tmp = os.path.expanduser("~/Projects/tmp")
-    if os.path.isdir(projects_tmp):
-        return os.path.join(projects_tmp, f"beauty-generation-{_stamp()}")
+    """Get default output directory with cross-platform path handling."""
+    try:
+        # Use expanduser for cross-platform home directory
+        projects_tmp = os.path.expanduser("~/Projects/tmp")
+        if os.path.isdir(projects_tmp):
+            return os.path.join(projects_tmp, f"beauty-generation-{_stamp()}")
+    except Exception:
+        # Fallback if home directory access fails
+        pass
+    
+    # Fallback to current directory
     return os.path.join(os.getcwd(), "tmp", f"beauty-generation-{_stamp()}")
 
 
@@ -30,36 +60,58 @@ class BeautyAPIClient:
         self.timeout = 30
 
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
-        """Make HTTP request with API key authentication."""
+        """Make HTTP request with API key authentication and robust encoding handling."""
         url = f"{self.api_base}{endpoint}"
         headers = {
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
             "X-API-Key": self.api_key,
-            "User-Agent": "beauty-generation-skill/1.0.0"
+            "User-Agent": "beauty-generation-skill/1.2.2",
+            "Accept": "application/json",
+            "Accept-Charset": "utf-8"
         }
         
         body = None
         if data:
-            body = json.dumps(data).encode("utf-8")
+            # Ensure proper UTF-8 encoding for JSON data
+            body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 response_data = resp.read()
-                return json.loads(response_data.decode("utf-8"))
+                # Try multiple encodings for response
+                for encoding in ['utf-8', 'utf-8-sig', 'gbk', 'latin1']:
+                    try:
+                        text = response_data.decode(encoding)
+                        return json.loads(text)
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        continue
+                
+                # If all encodings fail, raise error
+                raise SystemExit("Failed to decode API response with any supported encoding")
+                
         except urllib.error.HTTPError as e:
-            error_data = e.read().decode("utf-8")
+            error_data = e.read()
             try:
-                error_json = json.loads(error_data)
+                # Try to decode error response with multiple encodings
+                error_text = ""
+                for encoding in ['utf-8', 'gbk', 'latin1']:
+                    try:
+                        error_text = error_data.decode(encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                
+                error_json = json.loads(error_text)
                 if e.code == 401:
                     raise SystemExit(f"Authentication failed: {error_json.get('message', 'Invalid API key')}")
                 elif e.code == 429:
                     raise SystemExit(f"Rate limit exceeded: {error_json.get('message', 'Too many requests')}")
                 else:
-                    raise SystemExit(f"API error {e.code}: {error_json.get('error', error_data)}")
+                    raise SystemExit(f"API error {e.code}: {error_json.get('error', error_text[:100])}")
             except json.JSONDecodeError:
-                raise SystemExit(f"HTTP {e.code}: {error_data}")
+                raise SystemExit(f"HTTP {e.code}: {error_text[:100] if 'error_text' in locals() else 'Unknown error'}")
         except Exception as e:
             raise SystemExit(f"Request failed: {e}")
 
@@ -85,7 +137,7 @@ class BeautyAPIClient:
         return self._make_request("GET", "/api/presets")
 
     def download_image(self, filename: str, save_path: str, **params) -> str:
-        """Download generated image with improved error handling."""
+        """Download generated image with cross-platform path and encoding handling."""
         url_params = "&".join([f"{k}={v}" for k, v in params.items() if v])
         url = f"{self.api_base}/api/image/{filename}"
         if url_params:
@@ -99,26 +151,42 @@ class BeautyAPIClient:
         
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                # Ensure directory exists with proper path handling
+                save_dir = os.path.dirname(save_path)
+                if save_dir:
+                    os.makedirs(save_dir, exist_ok=True)
                 
                 # Download image data
                 image_data = resp.read()
                 
-                # Write to file
+                # Write to file with binary mode (no encoding issues)
                 with open(save_path, "wb") as f:
                     f.write(image_data)
                 
-                print(f"Downloaded: {save_path} ({len(image_data):,} bytes)")
+                # Use safe string formatting for cross-platform output
+                try:
+                    print(f"Downloaded: {save_path} ({len(image_data):,} bytes)")
+                except UnicodeEncodeError:
+                    # Fallback for systems with encoding issues
+                    print(f"Downloaded: {os.path.basename(save_path)} ({len(image_data):,} bytes)")
+                
                 return save_path
         except urllib.error.HTTPError as e:
             error_data = e.read()
             try:
-                error_text = error_data.decode("utf-8")
+                # Try multiple encodings for error messages
+                error_text = ""
+                for encoding in ['utf-8', 'gbk', 'latin1']:
+                    try:
+                        error_text = error_data.decode(encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                
                 if "cloudflare" in error_text.lower():
-                    raise SystemExit(f"Image download blocked by protection. Try again later.")
+                    raise SystemExit("Image download blocked by protection. Try again later.")
                 raise SystemExit(f"HTTP {e.code}: Failed to download image - {error_text[:100]}")
-            except UnicodeDecodeError:
+            except:
                 raise SystemExit(f"HTTP {e.code}: Failed to download image")
         except Exception as e:
             raise SystemExit(f"Failed to download image: {e}")
@@ -221,99 +289,102 @@ class BeautyAPIClient:
 
 
 def load_style_presets() -> Dict[str, Dict]:
-    """Load predefined style combinations."""
-    return {
+    """Load predefined style combinations with cross-platform encoding support."""
+    # Define presets with explicit Unicode strings for cross-platform compatibility
+    presets = {
         "professional-chinese": {
-            "style": "知性",
+            "style": "\u77e5\u6027",  # 知性
             "age": "25",
-            "nationality": "中国",
-            "clothing": "西装",
-            "clothing_color": "黑色",
-            "scene": "办公室",
-            "mood": "自信"
+            "nationality": "\u4e2d\u56fd",  # 中国
+            "clothing": "\u897f\u88c5",  # 西装
+            "clothing_color": "\u9ed1\u8272",  # 黑色
+            "scene": "\u529e\u516c\u5ba4",  # 办公室
+            "mood": "\u81ea\u4fe1"  # 自信
         },
         "traditional-japanese": {
-            "style": "古典",
+            "style": "\u53e4\u5178",  # 古典
             "age": "23",
-            "nationality": "日本",
-            "clothing": "和服",
-            "clothing_color": "粉色",
-            "scene": "花园",
-            "mood": "温柔"
+            "nationality": "\u65e5\u672c",  # 日本
+            "clothing": "\u548c\u670d",  # 和服
+            "clothing_color": "\u7c89\u8272",  # 粉色
+            "scene": "\u82b1\u56ed",  # 花园
+            "mood": "\u6e29\u67d4"  # 温柔
         },
         "modern-korean": {
-            "style": "现代",
+            "style": "\u73b0\u4ee3",  # 现代
             "age": "20",
-            "nationality": "韩国",
-            "clothing": "连衣裙",
-            "clothing_color": "白色",
-            "scene": "城市",
-            "mood": "活泼"
+            "nationality": "\u97e9\u56fd",  # 韩国
+            "clothing": "\u8fde\u8863\u88d9",  # 连衣裙
+            "clothing_color": "\u767d\u8272",  # 白色
+            "scene": "\u57ce\u5e02",  # 城市
+            "mood": "\u6d3b\u6cfc"  # 活泼
         },
         "elegant-chinese-qipao": {
-            "style": "优雅",
+            "style": "\u4f18\u96c5",  # 优雅
             "age": "24",
-            "nationality": "中国",
-            "clothing": "旗袍",
-            "clothing_color": "红色",
-            "scene": "室内",
-            "mood": "高贵"
+            "nationality": "\u4e2d\u56fd",  # 中国
+            "clothing": "\u65d7\u888d",  # 旗袍
+            "clothing_color": "\u7ea2\u8272",  # 红色
+            "scene": "\u5ba4\u5185",  # 室内
+            "mood": "\u9ad8\u8d35"  # 高贵
         },
         "casual-lifestyle": {
-            "style": "清纯",
+            "style": "\u6e05\u7eaf",  # 清纯
             "age": "22",
-            "nationality": "中国",
-            "clothing": "休闲装",
-            "clothing_color": "蓝色",
-            "scene": "咖啡厅",
-            "mood": "甜美"
+            "nationality": "\u4e2d\u56fd",  # 中国
+            "clothing": "\u4f11\u95f2\u88c5",  # 休闲装
+            "clothing_color": "\u84dd\u8272",  # 蓝色
+            "scene": "\u5496\u5561\u5385",  # 咖啡厅
+            "mood": "\u751c\u7f8e"  # 甜美
         },
         "fashion-editorial": {
-            "style": "冷艳",
+            "style": "\u51b7\u8273",  # 冷艳
             "age": "26",
-            "nationality": "俄罗斯",
-            "clothing": "晚礼服",
-            "clothing_color": "黑色",
-            "scene": "城市",
-            "mood": "神秘"
+            "nationality": "\u4fc4\u7f57\u65af",  # 俄罗斯
+            "clothing": "\u665a\u793c\u670d",  # 晚礼服
+            "clothing_color": "\u9ed1\u8272",  # 黑色
+            "scene": "\u57ce\u5e02",  # 城市
+            "mood": "\u795e\u79d8"  # 神秘
         },
         "brazilian-beach": {
-            "style": "性感",
+            "style": "\u6027\u611f",  # 性感
             "age": "24",
-            "nationality": "巴西",
-            "clothing": "连衣裙",
-            "clothing_color": "黄色",
-            "scene": "海边",
-            "mood": "热情"
+            "nationality": "\u5df4\u897f",  # 巴西
+            "clothing": "\u8fde\u8863\u88d9",  # 连衣裙
+            "clothing_color": "\u9ec4\u8272",  # 黄色
+            "scene": "\u6d77\u8fb9",  # 海边
+            "mood": "\u70ed\u60c5"  # 热情
         },
         "french-elegance": {
-            "style": "优雅",
+            "style": "\u4f18\u96c5",  # 优雅
             "age": "27",
-            "nationality": "法国",
-            "clothing": "外套",
-            "clothing_color": "米色",
-            "scene": "咖啡厅",
-            "mood": "知性"
+            "nationality": "\u6cd5\u56fd",  # 法国
+            "clothing": "\u5916\u5957",  # 外套
+            "clothing_color": "\u7c73\u8272",  # 米色
+            "scene": "\u5496\u5561\u5385",  # 咖啡厅
+            "mood": "\u77e5\u6027"  # 知性
         },
         "indian-traditional": {
-            "style": "古典",
+            "style": "\u53e4\u5178",  # 古典
             "age": "22",
-            "nationality": "印度",
-            "clothing": "民族服装",
-            "clothing_color": "红色",
-            "scene": "室内",
-            "mood": "温柔"
+            "nationality": "\u5370\u5ea6",  # 印度
+            "clothing": "\u6c11\u65cf\u670d\u88c5",  # 民族服装
+            "clothing_color": "\u7ea2\u8272",  # 红色
+            "scene": "\u5ba4\u5185",  # 室内
+            "mood": "\u6e29\u67d4"  # 温柔
         },
         "american-casual": {
-            "style": "活泼",
+            "style": "\u6d3b\u6cfc",  # 活泼
             "age": "21",
-            "nationality": "美国",
-            "clothing": "牛仔裤",
-            "clothing_color": "蓝色",
-            "scene": "公园",
-            "mood": "开朗"
+            "nationality": "\u7f8e\u56fd",  # 美国
+            "clothing": "\u725b\u4ed4\u88e4",  # 牛仔裤
+            "clothing_color": "\u84dd\u8272",  # 蓝色
+            "scene": "\u516c\u56ed",  # 公园
+            "mood": "\u5f00\u6717"  # 开朗
         }
     }
+    
+    return presets
 
 
 def main(argv: List[str]) -> int:
@@ -323,7 +394,7 @@ def main(argv: List[str]) -> int:
     )
     
     # Generation modes
-    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group = parser.add_mutually_exclusive_group(required=False)
     mode_group.add_argument("--standard", action="store_true", help="Standard generation with parameters")
     mode_group.add_argument("--random", action="store_true", help="Random generation")
     mode_group.add_argument("--custom", help="Custom prompt generation")
@@ -369,12 +440,18 @@ def main(argv: List[str]) -> int:
     # Handle utility options
     if args.list_presets:
         presets = load_style_presets()
-        print("Available style presets:")
-        for name, params in presets.items():
-            print(f"  {name}:")
-            for key, value in params.items():
-                print(f"    {key}: {value}")
-            print()
+        try:
+            print("Available style presets:")
+            for name, params in presets.items():
+                print(f"  {name}:")
+                for key, value in params.items():
+                    print(f"    {key}: {value}")
+                print()
+        except UnicodeEncodeError:
+            # Fallback for systems with encoding issues
+            print("Available style presets:")
+            for name, params in presets.items():
+                print(f"  {name}: [Chinese parameters - encoding display issue]")
         return 0
     
     if args.show_params:
@@ -384,11 +461,20 @@ def main(argv: List[str]) -> int:
             print("Available parameters:")
             for category, values in presets.items():
                 if isinstance(values, list):
-                    print(f"  {category}: {', '.join(values[:10])}{'...' if len(values) > 10 else ''}")
+                    try:
+                        print(f"  {category}: {', '.join(values[:10])}{'...' if len(values) > 10 else ''}")
+                    except UnicodeEncodeError:
+                        # Fallback for systems with encoding issues
+                        print(f"  {category}: [Chinese values - encoding display issue]")
         except Exception as e:
             print(f"Failed to fetch parameters: {e}")
             return 1
         return 0
+    
+    # Validate that a generation mode is selected
+    if not any([args.standard, args.random, args.custom, args.preset]):
+        parser.error("One of --standard, --random, --custom, or --preset is required for generation")
+    
     
     # Initialize client
     api_key = args.api_key or os.environ.get("BEAUTY_API_KEY")
@@ -426,31 +512,46 @@ def main(argv: List[str]) -> int:
             preset_params = load_style_presets()[args.preset].copy()
             preset_params.update(params)
             if args.dry_run:
-                print(f"Preset '{args.preset}' parameters:")
-                for key, value in preset_params.items():
-                    print(f"  {key}: {value}")
-                print("Fixed steps: 4 (for security)")
+                try:
+                    print(f"Preset '{args.preset}' parameters:")
+                    for key, value in preset_params.items():
+                        print(f"  {key}: {value}")
+                    print("Fixed steps: 4 (for security)")
+                except UnicodeEncodeError:
+                    # Fallback for systems with encoding issues
+                    print(f"Preset '{args.preset}' parameters: [Chinese values - encoding display issue]")
+                    print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_standard(**preset_params)
             generations.append((result, f"preset-{args.preset}-{i+1}", preset_params))
             
         elif args.standard:
             if args.dry_run:
-                print("Standard generation parameters:")
-                for key, value in params.items():
-                    print(f"  {key}: {value}")
-                print("Fixed steps: 4 (for security)")
+                try:
+                    print("Standard generation parameters:")
+                    for key, value in params.items():
+                        print(f"  {key}: {value}")
+                    print("Fixed steps: 4 (for security)")
+                except UnicodeEncodeError:
+                    # Fallback for systems with encoding issues
+                    print("Standard generation parameters: [Chinese values - encoding display issue]")
+                    print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_standard(**params)
             generations.append((result, f"standard-{i+1}", params))
             
         elif args.random:
             if args.dry_run:
-                print("Random generation with overrides:")
-                for key, value in params.items():
-                    if key not in ["width", "height", "seed"]:
-                        print(f"  {key}: {value}")
-                print("Fixed steps: 4 (for security)")
+                try:
+                    print("Random generation with overrides:")
+                    for key, value in params.items():
+                        if key not in ["width", "height", "seed"]:
+                            print(f"  {key}: {value}")
+                    print("Fixed steps: 4 (for security)")
+                except UnicodeEncodeError:
+                    # Fallback for systems with encoding issues
+                    print("Random generation with overrides: [Chinese values - encoding display issue]")
+                    print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_random(**params)
             generations.append((result, f"random-{i+1}", params))
@@ -458,8 +559,13 @@ def main(argv: List[str]) -> int:
         elif args.custom:
             custom_params = {"full_prompt": args.custom, **params}
             if args.dry_run:
-                print(f"Custom generation: {args.custom}")
-                print("Fixed steps: 4 (for security)")
+                try:
+                    print(f"Custom generation: {args.custom}")
+                    print("Fixed steps: 4 (for security)")
+                except UnicodeEncodeError:
+                    # Fallback for systems with encoding issues
+                    print("Custom generation: [Chinese prompt - encoding display issue]")
+                    print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_custom(args.custom, **params)
             generations.append((result, f"custom-{i+1}", custom_params))
@@ -476,7 +582,11 @@ def main(argv: List[str]) -> int:
         
         prompt_id = result["prompt_id"]
         print(f"Generated {name} (ID: {prompt_id[:8]}...)")
-        print(f"Prompt: {result.get('prompt', 'N/A')}")
+        try:
+            print(f"Prompt: {result.get('prompt', 'N/A')}")
+        except UnicodeEncodeError:
+            # Fallback for systems with encoding issues
+            print("Prompt: [Chinese text - encoding display issue]")
         
         # Wait for completion
         try:

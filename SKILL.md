@@ -392,6 +392,14 @@ curl -X POST https://gen1.diversityfaces.org/api/generate \
 
 ## 🖼️ Image Download & Output
 
+### Cross-Platform Compatibility
+The script is designed to work reliably across different operating systems and locale settings:
+
+- **Encoding Support**: Automatic UTF-8 handling with fallbacks for different system encodings
+- **Path Handling**: Cross-platform directory and file path management
+- **Locale Independence**: Works on systems with different default languages and character sets
+- **Error Resilience**: Graceful fallbacks when Unicode display is not supported
+
 ### Default Download Locations
 The script automatically chooses the best download location:
 
@@ -456,9 +464,11 @@ output_directory/
 
 ### Error Handling
 - **Automatic Retry**: Built-in retry logic for network issues
-- **Encoding Support**: Multiple character encoding detection
+- **Encoding Support**: Multiple character encoding detection and fallbacks
 - **Cloudflare Protection**: Handles server protection mechanisms
 - **Timeout Management**: Configurable timeout with graceful failure
+- **Cross-Platform**: Works reliably on Windows, macOS, Linux with different locale settings
+- **Unicode Fallbacks**: Graceful handling when Chinese characters cannot be displayed
 
 ## Best Practices
 

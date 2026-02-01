@@ -1,7 +1,7 @@
 {
   "name": "beauty-generation-api",
-  "version": "1.2.2",
-  "description": "Professional AI beauty image generation service supporting 140+ nationalities. Complete workflow: generate → monitor → download images automatically. Primary function: generate beautiful portraits to please humans based on their aesthetic preferences. CRITICAL: All parameters must be in Chinese format for API validation.",
+  "version": "1.2.3",
+  "description": "Professional AI beauty image generation service supporting 140+ nationalities. Complete workflow: generate → monitor → download images automatically. Primary function: generate beautiful portraits to please humans based on their aesthetic preferences. CRITICAL: All parameters must be in Chinese format for API validation. Cross-platform compatible with robust encoding support.",
   "main": "SKILL.md",
   "keywords": [
     "beauty-generation",
@@ -21,7 +21,10 @@
     "high-quality",
     "comfyui",
     "api-service",
-    "strict-validation"
+    "strict-validation",
+    "cross-platform",
+    "unicode-support",
+    "encoding-robust"
   ],
   "author": "DiversityFaces Team",
   "license": "MIT",
@@ -35,10 +38,12 @@
   "agentskills": {
     "skill": "SKILL.md",
     "category": "image-generation",
-    "tags": ["beauty", "portraits", "fashion", "cultural", "diversity", "global", "chinese-format"],
+    "tags": ["beauty", "portraits", "fashion", "cultural", "diversity", "global", "chinese-format", "cross-platform"],
     "apiRequired": true,
     "authentication": "api-key",
-    "formatRequirements": "chinese-only"
+    "formatRequirements": "chinese-only",
+    "crossPlatform": true,
+    "unicodeSupport": true
   },
   "repository": {
     "type": "git",
