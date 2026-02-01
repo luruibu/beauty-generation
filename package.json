@@ -1,0 +1,51 @@
+{
+  "name": "beauty-generation-api",
+  "version": "1.1.0",
+  "description": "Professional AI beauty image generation service supporting 140+ nationalities. Generate high-quality portraits of women with customizable parameters. CRITICAL: All parameters must be in Chinese format for API validation.",
+  "main": "SKILL.md",
+  "keywords": [
+    "beauty-generation",
+    "portrait-photography",
+    "character-design",
+    "fashion-design",
+    "ai-art",
+    "image-generation",
+    "global-diversity",
+    "cultural-portraits",
+    "professional-headshots",
+    "traditional-clothing",
+    "modern-fashion",
+    "140-countries",
+    "chinese-parameters",
+    "customizable-parameters",
+    "high-quality",
+    "comfyui",
+    "api-service",
+    "strict-validation"
+  ],
+  "author": "DiversityFaces Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "SKILL.md",
+    "scripts/"
+  ],
+  "agentskills": {
+    "skill": "SKILL.md",
+    "category": "image-generation",
+    "tags": ["beauty", "portraits", "fashion", "cultural", "diversity", "global", "chinese-format"],
+    "apiRequired": true,
+    "authentication": "api-key",
+    "formatRequirements": "chinese-only"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/diversityfaces/beauty-generation-api-skill"
+  },
+  "homepage": "https://gen1.diversityfaces.org",
+  "bugs": {
+    "url": "https://github.com/diversityfaces/beauty-generation-api-skill/issues"
+  }
+}
