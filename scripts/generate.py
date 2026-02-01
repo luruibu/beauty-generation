@@ -85,40 +85,139 @@ class BeautyAPIClient:
         return self._make_request("GET", "/api/presets")
 
     def download_image(self, filename: str, save_path: str, **params) -> str:
-        """Download generated image."""
+        """Download generated image with improved error handling."""
         url_params = "&".join([f"{k}={v}" for k, v in params.items() if v])
         url = f"{self.api_base}/api/image/{filename}"
         if url_params:
             url += f"?{url_params}"
         
-        headers = {"X-API-Key": self.api_key}
+        headers = {
+            "X-API-Key": self.api_key,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
         req = urllib.request.Request(url, headers=headers)
         
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                # Ensure directory exists
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                
+                # Download image data
+                image_data = resp.read()
+                
+                # Write to file
                 with open(save_path, "wb") as f:
-                    f.write(resp.read())
+                    f.write(image_data)
+                
+                print(f"Downloaded: {save_path} ({len(image_data):,} bytes)")
                 return save_path
+        except urllib.error.HTTPError as e:
+            error_data = e.read()
+            try:
+                error_text = error_data.decode("utf-8")
+                if "cloudflare" in error_text.lower():
+                    raise SystemExit(f"Image download blocked by protection. Try again later.")
+                raise SystemExit(f"HTTP {e.code}: Failed to download image - {error_text[:100]}")
+            except UnicodeDecodeError:
+                raise SystemExit(f"HTTP {e.code}: Failed to download image")
         except Exception as e:
             raise SystemExit(f"Failed to download image: {e}")
 
     def wait_for_completion(self, prompt_id: str, max_wait: int = 300) -> Dict:
-        """Wait for generation to complete."""
+        """Wait for generation to complete with robust error handling."""
         start_time = time.time()
+        retry_count = 0
+        max_retries = 3
+        
+        print(f"Waiting for completion (max {max_wait}s)...")
         
         while time.time() - start_time < max_wait:
-            status = self.check_status(prompt_id)
+            try:
+                # Use a more robust status check
+                status = self._check_status_robust(prompt_id)
+                
+                if status["status"] == "completed":
+                    print("✅ Generation completed!")
+                    return status
+                elif status["status"] == "failed":
+                    raise SystemExit(f"Generation failed: {status.get('message', 'Unknown error')}")
+                elif status["status"] == "error":
+                    if retry_count < max_retries:
+                        retry_count += 1
+                        print(f"Status check error, retrying ({retry_count}/{max_retries})...")
+                        time.sleep(5)
+                        continue
+                    else:
+                        raise SystemExit(f"Status check failed after {max_retries} retries")
+                
+                print(f"Status: {status['status']} - {status.get('message', 'Processing...')}")
+                retry_count = 0  # Reset retry count on successful request
+                
+            except SystemExit:
+                raise
+            except Exception as e:
+                if retry_count < max_retries:
+                    retry_count += 1
+                    print(f"Status check error, retrying ({retry_count}/{max_retries}): {e}")
+                    time.sleep(5)
+                    continue
+                else:
+                    raise SystemExit(f"Status check failed after {max_retries} retries: {e}")
             
-            if status["status"] == "completed":
-                return status
-            elif status["status"] == "failed":
-                raise SystemExit(f"Generation failed: {status.get('message', 'Unknown error')}")
-            
-            print(f"Status: {status['status']} - {status.get('message', 'Processing...')}")
-            time.sleep(2)
+            time.sleep(3)
         
         raise SystemExit(f"Generation timeout after {max_wait} seconds")
+    
+    def _check_status_robust(self, prompt_id: str) -> Dict:
+        """Robust status check with multiple encoding attempts."""
+        url = f"{self.api_base}/api/status/{prompt_id}"
+        headers = {
+            "X-API-Key": self.api_key,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+            "Accept-Charset": "utf-8"
+        }
+        
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                response_data = resp.read()
+                
+                # Try multiple encodings
+                for encoding in ['utf-8', 'utf-8-sig', 'gbk', 'latin1']:
+                    try:
+                        text = response_data.decode(encoding)
+                        return json.loads(text)
+                    except (UnicodeDecodeError, json.JSONDecodeError):
+                        continue
+                
+                # If all encodings fail, return error status
+                return {"status": "error", "message": "Failed to decode response"}
+                
+        except urllib.error.HTTPError as e:
+            error_data = e.read()
+            
+            # Try to decode error response
+            error_text = ""
+            for encoding in ['utf-8', 'gbk', 'latin1']:
+                try:
+                    error_text = error_data.decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if "cloudflare" in error_text.lower() or "<html" in error_text.lower():
+                return {"status": "error", "message": "Server protection detected"}
+            
+            try:
+                error_json = json.loads(error_text)
+                return {"status": "error", "message": error_json.get("error", "API error")}
+            except json.JSONDecodeError:
+                return {"status": "error", "message": f"HTTP {e.code}"}
+                
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
 
 def load_style_presets() -> Dict[str, Dict]:
@@ -246,8 +345,9 @@ def main(argv: List[str]) -> int:
     # Image parameters
     parser.add_argument("--width", type=int, default=1024, help="Image width (default: 1024)")
     parser.add_argument("--height", type=int, default=1024, help="Image height (default: 1024)")
-    parser.add_argument("--steps", type=int, default=4, help="Sampling steps (default: 4)")
     parser.add_argument("--seed", type=int, default=-1, help="Random seed (default: -1)")
+    
+    # Note: Steps are fixed at 4 for security and performance
     
     # Output options
     parser.add_argument("--out-dir", help="Output directory")
@@ -304,9 +404,10 @@ def main(argv: List[str]) -> int:
     params = {
         "width": args.width,
         "height": args.height,
-        "steps": args.steps,
         "seed": args.seed
     }
+    
+    # Steps are fixed at 4 for security
     
     # Add style parameters
     style_params = ["style", "age", "nationality", "clothing", "clothing_color", 
@@ -328,6 +429,7 @@ def main(argv: List[str]) -> int:
                 print(f"Preset '{args.preset}' parameters:")
                 for key, value in preset_params.items():
                     print(f"  {key}: {value}")
+                print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_standard(**preset_params)
             generations.append((result, f"preset-{args.preset}-{i+1}", preset_params))
@@ -337,6 +439,7 @@ def main(argv: List[str]) -> int:
                 print("Standard generation parameters:")
                 for key, value in params.items():
                     print(f"  {key}: {value}")
+                print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_standard(**params)
             generations.append((result, f"standard-{i+1}", params))
@@ -345,8 +448,9 @@ def main(argv: List[str]) -> int:
             if args.dry_run:
                 print("Random generation with overrides:")
                 for key, value in params.items():
-                    if key not in ["width", "height", "steps", "seed"]:
+                    if key not in ["width", "height", "seed"]:
                         print(f"  {key}: {value}")
+                print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_random(**params)
             generations.append((result, f"random-{i+1}", params))
@@ -355,6 +459,7 @@ def main(argv: List[str]) -> int:
             custom_params = {"full_prompt": args.custom, **params}
             if args.dry_run:
                 print(f"Custom generation: {args.custom}")
+                print("Fixed steps: 4 (for security)")
                 continue
             result = client.generate_custom(args.custom, **params)
             generations.append((result, f"custom-{i+1}", custom_params))

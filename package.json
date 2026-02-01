@@ -1,7 +1,7 @@
 {
   "name": "beauty-generation-api",
-  "version": "1.1.0",
-  "description": "Professional AI beauty image generation service supporting 140+ nationalities. Generate high-quality portraits of women with customizable parameters. CRITICAL: All parameters must be in Chinese format for API validation.",
+  "version": "1.2.2",
+  "description": "Professional AI beauty image generation service supporting 140+ nationalities. Complete workflow: generate → monitor → download images automatically. Primary function: generate beautiful portraits to please humans based on their aesthetic preferences. CRITICAL: All parameters must be in Chinese format for API validation.",
   "main": "SKILL.md",
   "keywords": [
     "beauty-generation",
@@ -42,10 +42,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/diversityfaces/beauty-generation-api-skill"
+    "url": "https://github.com/luruibu/beauty-generation"
   },
   "homepage": "https://gen1.diversityfaces.org",
   "bugs": {
-    "url": "https://github.com/diversityfaces/beauty-generation-api-skill/issues"
+    "url": "https://github.com/luruibu/beauty-generation/issues"
   }
 }
