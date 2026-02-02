@@ -150,6 +150,7 @@ class BeautyAPIClient:
         req = urllib.request.Request(url, headers=headers)
         
         try:
+            download_start = time.time()
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 # Ensure directory exists with proper path handling
                 save_dir = os.path.dirname(save_path)
@@ -163,12 +164,17 @@ class BeautyAPIClient:
                 with open(save_path, "wb") as f:
                     f.write(image_data)
                 
+                download_time = time.time() - download_start
+                
                 # Use safe string formatting for cross-platform output
                 try:
-                    print(f"Downloaded: {save_path} ({len(image_data):,} bytes)")
+                    print(f"🖼️  Downloaded: {save_path} ({len(image_data):,} bytes, {download_time:.1f}s)")
+                    print(f"📁 Full path: {os.path.abspath(save_path)}")
+                    print(f"🎉 Image ready for viewing!")
                 except UnicodeEncodeError:
                     # Fallback for systems with encoding issues
-                    print(f"Downloaded: {os.path.basename(save_path)} ({len(image_data):,} bytes)")
+                    print(f"🖼️  Downloaded: {os.path.basename(save_path)} ({len(image_data):,} bytes, {download_time:.1f}s)")
+                    print(f"🎉 Image ready for viewing!")
                 
                 return save_path
         except urllib.error.HTTPError as e:
@@ -192,12 +198,16 @@ class BeautyAPIClient:
             raise SystemExit(f"Failed to download image: {e}")
 
     def wait_for_completion(self, prompt_id: str, max_wait: int = 300) -> Dict:
-        """Wait for generation to complete with robust error handling."""
+        """Wait for generation to complete with optimized timing for fast generation."""
         start_time = time.time()
         retry_count = 0
         max_retries = 3
         
-        print(f"Waiting for completion (max {max_wait}s)...")
+        print(f"⏳ Waiting for completion (optimized for 5s generation)...")
+        
+        # Optimized polling strategy for fast generation
+        check_intervals = [1, 1, 1, 2, 2, 3, 3, 5, 5, 10]  # Start with 1s intervals
+        check_count = 0
         
         while time.time() - start_time < max_wait:
             try:
@@ -205,7 +215,8 @@ class BeautyAPIClient:
                 status = self._check_status_robust(prompt_id)
                 
                 if status["status"] == "completed":
-                    print("✅ Generation completed!")
+                    elapsed = time.time() - start_time
+                    print(f"✅ Generation completed in {elapsed:.1f}s!")
                     return status
                 elif status["status"] == "failed":
                     raise SystemExit(f"Generation failed: {status.get('message', 'Unknown error')}")
@@ -213,12 +224,13 @@ class BeautyAPIClient:
                     if retry_count < max_retries:
                         retry_count += 1
                         print(f"Status check error, retrying ({retry_count}/{max_retries})...")
-                        time.sleep(5)
+                        time.sleep(2)
                         continue
                     else:
                         raise SystemExit(f"Status check failed after {max_retries} retries")
                 
-                print(f"Status: {status['status']} - {status.get('message', 'Processing...')}")
+                elapsed = time.time() - start_time
+                print(f"⏱️  Status: {status['status']} - {status.get('message', 'Processing...')} ({elapsed:.1f}s)")
                 retry_count = 0  # Reset retry count on successful request
                 
             except SystemExit:
@@ -227,12 +239,19 @@ class BeautyAPIClient:
                 if retry_count < max_retries:
                     retry_count += 1
                     print(f"Status check error, retrying ({retry_count}/{max_retries}): {e}")
-                    time.sleep(5)
+                    time.sleep(2)
                     continue
                 else:
                     raise SystemExit(f"Status check failed after {max_retries} retries: {e}")
             
-            time.sleep(3)
+            # Use optimized intervals for faster response
+            if check_count < len(check_intervals):
+                sleep_time = check_intervals[check_count]
+            else:
+                sleep_time = 10  # Fall back to 10s intervals after initial fast checks
+            
+            time.sleep(sleep_time)
+            check_count += 1
         
         raise SystemExit(f"Generation timeout after {max_wait} seconds")
     
@@ -434,6 +453,7 @@ def main(argv: List[str]) -> int:
     parser.add_argument("--list-presets", action="store_true", help="List available presets")
     parser.add_argument("--show-params", action="store_true", help="Show available parameters")
     parser.add_argument("--dry-run", action="store_true", help="Show parameters without generating")
+    parser.add_argument("--quick", action="store_true", help="Quick generation mode (optimized for 5s generation)")
     
     args = parser.parse_args(argv)
     
@@ -483,6 +503,12 @@ def main(argv: List[str]) -> int:
         return 1
     
     client = BeautyAPIClient(args.api_base, api_key)
+    
+    # Optimize timeout for quick mode
+    if args.quick:
+        client.timeout = 15  # Shorter timeout for quick mode
+        print("🚀 Quick mode enabled - optimized for fast 5s generation!")
+    
     out_dir = args.out_dir or _default_out_dir()
     os.makedirs(out_dir, exist_ok=True)
     
@@ -575,24 +601,30 @@ def main(argv: List[str]) -> int:
     
     # Process generations
     results = []
-    for result, name, gen_params in generations:
+    total_start_time = time.time()
+    
+    for i, (result, name, gen_params) in enumerate(generations, 1):
         if not result.get("success"):
-            print(f"Generation failed: {result.get('error', 'Unknown error')}")
+            print(f"❌ Generation {i} failed: {result.get('error', 'Unknown error')}")
             continue
         
         prompt_id = result["prompt_id"]
-        print(f"Generated {name} (ID: {prompt_id[:8]}...)")
+        generation_start = time.time()
+        
+        print(f"🚀 Starting generation {i}/{len(generations)}: {name} (ID: {prompt_id[:8]}...)")
         try:
-            print(f"Prompt: {result.get('prompt', 'N/A')}")
+            print(f"📝 Prompt: {result.get('prompt', 'N/A')}")
         except UnicodeEncodeError:
             # Fallback for systems with encoding issues
-            print("Prompt: [Chinese text - encoding display issue]")
+            print("📝 Prompt: [Chinese text - encoding display issue]")
         
-        # Wait for completion
+        # Wait for completion with optimized timing
         try:
             final_status = client.wait_for_completion(prompt_id, args.timeout)
+            generation_time = time.time() - generation_start
             
-            # Download images
+            # Download images immediately
+            download_start = time.time()
             for j, img in enumerate(final_status["images"]):
                 filename = img["filename"]
                 ext = args.format
@@ -609,15 +641,28 @@ def main(argv: List[str]) -> int:
                 results.append({
                     "name": name,
                     "file": save_name,
+                    "full_path": os.path.abspath(save_path),
                     "prompt": result.get("prompt", ""),
                     "params": gen_params,
-                    "original_filename": filename
+                    "original_filename": filename,
+                    "generation_time": generation_time,
+                    "download_time": time.time() - download_start
                 })
                 
-                print(f"Saved: {save_name}")
+                print(f"✅ Completed: {save_name}")
+                
+                # Immediate notification to user
+                print("=" * 60)
+                print(f"🎨 IMAGE READY FOR VIEWING!")
+                print(f"📂 File: {save_name}")
+                print(f"📍 Location: {os.path.abspath(save_path)}")
+                print(f"⏱️  Total time: {time.time() - generation_start:.1f}s")
+                print("=" * 60)
         
         except Exception as e:
-            print(f"Failed to complete {name}: {e}")
+            print(f"❌ Failed to complete {name}: {e}")
+    
+    total_time = time.time() - total_start_time
     
     # Save metadata
     if results:
@@ -625,8 +670,24 @@ def main(argv: List[str]) -> int:
         with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
         
-        print(f"\nGenerated {len(results)} images in: {out_dir}")
-        print(f"Metadata saved to: generation_metadata.json")
+        print("\n" + "=" * 80)
+        print(f"🎉 GENERATION COMPLETE!")
+        print(f"📊 Generated {len(results)} images in {total_time:.1f}s")
+        print(f"📁 Output directory: {out_dir}")
+        print(f"📋 Metadata saved: generation_metadata.json")
+        print("=" * 80)
+        
+        # List all generated files for easy access
+        print("\n📸 Generated Images:")
+        for result in results:
+            gen_time = result.get('generation_time', 0)
+            dl_time = result.get('download_time', 0)
+            print(f"  • {result['file']} (gen: {gen_time:.1f}s, dl: {dl_time:.1f}s)")
+        
+        print(f"\n💡 All images are ready for immediate viewing!")
+        print(f"📂 Open folder: {out_dir}")
+    else:
+        print("\n❌ No images were generated successfully.")
     
     return 0
 

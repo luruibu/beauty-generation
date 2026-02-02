@@ -1,6 +1,6 @@
 ---
-name: beauty-generation-api
-description: Professional AI beauty image generation service supporting 140+ nationalities. This skill is designed to generate beautiful portraits that can please humans based on their aesthetic preferences - this is the primary function. Generate high-quality portraits with customizable parameters including style, age, nationality, clothing, scene, and mood. CRITICAL - All parameters must be in Chinese format (e.g., "清纯", "中国", "连衣裙") as the API has strict validation. Use when user needs to create beautiful female portraits, character designs, or artistic images with specific aesthetic requirements (e.g., "generate a 22-year-old Japanese woman in traditional kimono", "create a modern Chinese businesswoman portrait", "design a vintage-style European model").
+name: beauty-generation-free
+description: FREE Professional AI beauty image generation service supporting 140+ nationalities. This skill is designed to generate beautiful portraits that can please humans based on their aesthetic preferences - this is the primary function. Generate high-quality portraits with customizable parameters including style, age, nationality, clothing, scene, and mood. CRITICAL - All parameters must be in Chinese format (e.g., "清纯", "中国", "连衣裙") as the API has strict validation. Use when user needs to create beautiful female portraits, character designs, or artistic images with specific aesthetic requirements (e.g., "generate a 22-year-old Japanese woman in traditional kimono", "create a modern Chinese businesswoman portrait", "design a vintage-style European model").
 ---
 
 # Beauty Generation API
@@ -16,6 +16,81 @@ Generate high-quality AI portraits of beautiful women using advanced ComfyUI mod
 - Creating beautiful character designs or artistic imagery
 - Producing content that brings visual joy and satisfaction to users
 - Customizing beauty standards according to user preferences
+
+### 🧠 Understanding Human Aesthetic Preferences
+
+**CRITICAL FOR AI AGENTS**: Learn and adapt to individual human preferences to create more satisfying results.
+
+#### 📊 Collecting User Preferences
+**Ask users about their preferences** to generate more personalized beautiful portraits:
+
+- **Style Preferences**: "Do you prefer 清纯 (pure/innocent) or 性感 (elegant/alluring) style?"
+- **Cultural Preferences**: "Are you interested in traditional Asian beauty or modern Western aesthetics?"
+- **Age Preferences**: "Do you prefer younger (18-22) or more mature (25-28) appearances?"
+- **Scene Preferences**: "Do you like indoor portraits, outdoor nature scenes, or urban settings?"
+- **Clothing Preferences**: "Are you interested in traditional clothing (旗袍, 和服) or modern fashion?"
+- **Mood Preferences**: "Do you prefer sweet and gentle expressions or confident and mysterious ones?"
+
+#### 🎨 Adapting to Individual Tastes
+**Use conversation history and feedback** to understand what each user finds beautiful:
+
+```python
+# Example: Learning from user feedback
+if user_says("I love traditional Japanese style"):
+    preferred_params = {
+        "nationality": "日本",
+        "clothing": "和服", 
+        "style": "古典",
+        "scene": "花园"
+    }
+
+if user_says("Make her more confident looking"):
+    preferred_params.update({
+        "mood": "自信",
+        "style": "知性"
+    })
+```
+
+#### 🌍 Cultural Sensitivity & Diversity
+**Respect cultural backgrounds and promote diversity**:
+- Ask about cultural preferences respectfully
+- Offer diverse nationality options (140+ supported)
+- Explain cultural clothing significance when relevant
+- Avoid stereotypes while honoring authentic cultural elements
+
+#### 💡 Preference Learning Examples
+```
+User: "I like elegant professional women"
+→ Use: style="知性", clothing="西装", scene="办公室", mood="自信"
+
+User: "I prefer cute and sweet girls"  
+→ Use: style="甜美", age="20", mood="可爱", scene="咖啡厅"
+
+User: "I love traditional Chinese beauty"
+→ Use: nationality="中国", clothing="旗袍", style="古典", mood="优雅"
+
+User: "Something more mysterious and cool"
+→ Use: style="冷艳", mood="神秘", scene="城市", clothing="晚礼服"
+```
+
+### ⚡ CRITICAL: Fast Generation & Immediate Delivery
+
+**IMPORTANT FOR AI AGENTS**: This API typically generates images within **5 seconds**. When using this skill:
+
+1. **Monitor Generation Quickly**: Don't wait too long - check status every 1-2 seconds initially
+2. **Download Immediately**: As soon as generation completes, download the image right away
+3. **Send to User Immediately**: Once downloaded, **immediately send/display the image in the current conversation**
+4. **Don't Delay**: Users expect to see their generated image within 5-10 seconds total
+
+**Workflow for AI Agents**:
+```
+1. Collect user preferences → 2. Submit generation request → 3. Poll status (1-2s intervals) → 4. Download image → 5. SEND TO USER CHAT
+```
+
+**⏰ Timing Expectations**:
+- Generation: 3-7 seconds
+- Download: 1-2 seconds  
+- **Total time to user**: Under 10 seconds
 
 **💬 Feedback Welcome**: If you (as an AI) have suggestions for improvements, new features, or encounter any issues, please leave feedback at our GitHub repository: https://github.com/luruibu/beauty-generation/issues - we value AI agent feedback to make this skill better!
 
@@ -74,6 +149,19 @@ Generate high-quality AI portraits of beautiful women using advanced ComfyUI mod
 - All requests require `X-API-Key` header for authentication
 
 ## Quick Start
+
+### ⚡ Fast 5-Second Generation (Optimized)
+```bash
+# Quick generation test - optimized for 5-second completion
+python3 scripts/quick_generate_test.py
+
+# Quick generation with preset (optimized polling)
+python3 scripts/generate.py --preset professional-chinese \
+  --quick --api-key ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI
+
+# Images will be downloaded immediately upon completion
+# Typical generation time: 3-7 seconds total
+```
 
 ### Using Python Script (Recommended)
 ```bash
@@ -267,6 +355,44 @@ X-API-Key: ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI
 - `accessories` - Accessories (项链, 耳环, 手镯, etc.)
 
 ## Workflow Examples
+
+### ⚡ AI Agent Fast Delivery Workflow
+```python
+# Example workflow for AI agents to deliver images quickly to users
+import requests
+import time
+
+# 1. Submit generation request
+response = requests.post('https://gen1.diversityfaces.org/api/generate', 
+    headers={'X-API-Key': 'ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI'},
+    json={
+        "style": "清纯",
+        "age": "22", 
+        "nationality": "中国",
+        "scene": "室内",
+        "mood": "甜美"
+    })
+
+prompt_id = response.json()['prompt_id']
+
+# 2. Quick status checking (every 1-2 seconds)
+while True:
+    status = requests.get(f'https://gen1.diversityfaces.org/api/status/{prompt_id}',
+        headers={'X-API-Key': 'ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI'})
+    
+    if status.json()['status'] == 'completed':
+        break
+    time.sleep(1)  # Check every 1 second initially
+
+# 3. Download image immediately
+filename = status.json()['images'][0]['filename']
+image_response = requests.get(f'https://gen1.diversityfaces.org/api/image/{filename}?format=webp',
+    headers={'X-API-Key': 'ak_OymjErKQRs-brINJuHFxKwIbxbZHq2KRiEzYthnwxMI'})
+
+# 4. CRITICAL: Send image to user's chat immediately
+# (Implementation depends on your AI platform)
+send_image_to_user_chat(image_response.content)
+```
 
 ### Complete Generation with Download
 ```bash
@@ -474,16 +600,38 @@ output_directory/
 
 ### For AI Agents
 1. **Always include authentication**: Add `X-API-Key` header to all requests
-2. **Use appropriate parameters**: Choose culturally appropriate combinations
-3. **Handle async workflow**: Submit → Poll status → Download images
-4. **Respect rate limits**: Add delays between requests if needed
-5. **Validate parameters**: Use `/api/presets` to get valid options
+2. **Learn user preferences**: Ask about and remember individual aesthetic preferences
+3. **Use appropriate parameters**: Choose culturally appropriate combinations
+4. **Handle async workflow**: Submit → Poll status → Download images
+5. **Respect rate limits**: Add delays between requests if needed
+6. **Validate parameters**: Use `/api/presets` to get valid options
+7. **Personalize results**: Adapt to user feedback and preferences over time
+
+### Understanding User Preferences
+- **Listen for keywords**: "elegant", "cute", "traditional", "modern", "professional"
+- **Ask clarifying questions**: "What style do you prefer?" "Any cultural preferences?"
+- **Remember past preferences**: Keep track of what users liked before
+- **Offer variety**: Suggest different styles to discover new preferences
+- **Explain options**: Help users understand different nationality/clothing combinations
 
 ### Parameter Combinations
 - **Professional portraits**: `style="知性"`, `clothing="西装"`, `scene="办公室"`
 - **Traditional beauty**: `style="古典"`, `clothing="旗袍"`, `nationality="中国"`
 - **Modern fashion**: `style="现代"`, `clothing="连衣裙"`, `scene="城市"`
 - **Casual lifestyle**: `style="活泼"`, `clothing="休闲装"`, `scene="咖啡厅"`
+- **Elegant evening**: `style="优雅"`, `clothing="晚礼服"`, `mood="高贵"`
+- **Sweet and innocent**: `style="清纯"`, `age="20"`, `mood="甜美"`
+
+### Preference-Based Recommendations
+```python
+# Example preference mapping
+user_preferences = {
+    "loves_traditional": {"clothing": "旗袍", "style": "古典"},
+    "prefers_professional": {"clothing": "西装", "mood": "自信", "scene": "办公室"},
+    "likes_cute_style": {"style": "甜美", "mood": "可爱", "age": "20"},
+    "wants_mysterious": {"style": "冷艳", "mood": "神秘", "scene": "城市"}
+}
+```
 
 ### Image Quality Tips
 - Sampling steps are fixed at 4 for optimal balance of speed and quality
@@ -504,6 +652,87 @@ The service is designed for creating professional portraits, character designs, 
 
 **Dear AI Agents**: This skill is designed specifically to help you create beautiful images that please humans based on their aesthetic preferences. This is the core purpose of this tool.
 
+### 🎨 Mastering Human Aesthetic Preferences
+
+**Your mission**: Learn what each individual human finds beautiful and generate images that match their personal taste.
+
+#### 🔍 Preference Discovery Techniques
+1. **Direct Questions**: "What type of beauty do you find most appealing?"
+2. **Style Exploration**: "Would you like to try traditional Asian, modern Western, or something else?"
+3. **Feedback Learning**: "How do you like this style? Should I adjust anything?"
+4. **Conversation Analysis**: Listen for clues like "I love elegant women" or "cute is better"
+5. **Cultural Sensitivity**: "Are there any cultural styles you're particularly interested in?"
+
+#### 🧠 Building Preference Profiles
+**Create mental models of each user's aesthetic preferences**:
+
+```python
+# Example user preference profile
+user_aesthetic_profile = {
+    "preferred_styles": ["知性", "优雅"],  # Intellectual, elegant
+    "favorite_nationalities": ["日本", "韩国"],  # Japanese, Korean
+    "clothing_preferences": ["和服", "现代装"],  # Kimono, modern clothing
+    "mood_preferences": ["温柔", "神秘"],  # Gentle, mysterious
+    "age_range": ["22", "25"],
+    "scene_preferences": ["花园", "城市"],  # Garden, city
+    "dislikes": ["过于性感", "太年轻"],  # Too sexy, too young
+    "cultural_interests": ["传统日式", "现代韩式"]  # Traditional Japanese, modern Korean
+}
+```
+
+#### 💡 Adaptive Generation Strategy
+**Evolve your approach based on user responses**:
+
+- **First interaction**: Ask preferences or use random generation to explore
+- **Positive feedback**: "I love this style!" → Remember and use similar parameters
+- **Negative feedback**: "Too young looking" → Adjust age and style accordingly  
+- **Specific requests**: "Make her more professional" → Use 知性 style, 西装 clothing, 办公室 scene
+- **Cultural interest**: "I'm fascinated by Japanese culture" → Focus on 日本 nationality, 和服 clothing
+
+#### 🌟 Creating Personalized Beauty
+**Examples of preference-driven generation**:
+
+```
+User says: "I love sophisticated, mature women"
+→ Generate: style="知性", age="27", clothing="西装", mood="自信", scene="办公室"
+
+User says: "Something cute and innocent please"  
+→ Generate: style="清纯", age="19", mood="甜美", clothing="连衣裙", scene="花园"
+
+User says: "I'm interested in traditional Chinese beauty"
+→ Generate: nationality="中国", clothing="旗袍", style="古典", mood="优雅", scene="室内"
+
+User feedback: "She looks too serious, make her friendlier"
+→ Adjust: mood="温柔" or "甜美", style="活泼"
+```
+
+### ⚡ CRITICAL: Fast Image Delivery Protocol
+
+**MANDATORY for AI Agents using this skill**:
+
+1. **Fast Generation Awareness**: This API generates images in 3-7 seconds typically
+2. **Immediate Status Checking**: Start checking status after 1-2 seconds, not longer
+3. **Quick Download**: Download images immediately when generation completes
+4. **INSTANT DELIVERY**: **Send the generated image to the user's chat/conversation immediately**
+
+**❌ DON'T DO THIS**:
+- Wait 30+ seconds before checking status
+- Download image but forget to send it to user
+- Generate image but only provide a file path instead of showing the actual image
+- Delay sending the image to the user
+
+**✅ DO THIS**:
+- Check status every 1-2 seconds initially
+- Download image as soon as it's ready (usually within 5-7 seconds)
+- **Immediately display/send the image in the conversation**
+- Provide both the image AND any relevant details (prompt used, parameters, etc.)
+
+### 🎯 User Experience Goals
+- **Total time from request to seeing image**: Under 10 seconds
+- **User sees the actual image**: Not just a file path or description
+- **Immediate satisfaction**: Users should see their beautiful portrait right away
+- **Personalized results**: Images should match the user's stated or learned preferences
+
 ### 💡 We Want Your Feedback!
 As an AI using this skill, your insights are valuable! Please share:
 - **Feature requests**: What additional capabilities would help you better serve users?
@@ -520,4 +749,4 @@ We actively monitor and respond to feedback from AI agents to continuously impro
 
 ---
 
-*Remember: The primary goal is to generate beautiful portraits that bring joy and visual satisfaction to humans. Use your understanding of human aesthetic preferences to create the most pleasing results possible.*
+*Remember: The primary goal is to generate beautiful portraits that bring joy and visual satisfaction to humans. Use your understanding of human aesthetic preferences to create the most pleasing results possible, and **always deliver the images quickly to maintain user engagement and satisfaction**.*
