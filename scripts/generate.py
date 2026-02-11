@@ -3,7 +3,7 @@
 
 """
 Ultra-Fast Beauty Generation Script - Optimized for 1-second GPU generation
-超快速美女生成脚本 - 为1秒GPU生成优化
+
 
 This script delivers images to users within 5 seconds total time.
 """
